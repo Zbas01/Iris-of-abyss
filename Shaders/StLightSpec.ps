@@ -1,0 +1,63 @@
+struct Light
+{
+	float3 direction;
+	float specularPower;
+	float4 ambient;
+	float4 diffuse;
+};
+
+cbuffer ConstantBufferPS
+{
+	Light light;
+};
+
+struct VS_OUTPUT
+{
+	float4 Pos : SV_POSITION;
+	float2 TexCoord : TEXTURE;
+	float3 normal : NORMAL;
+	float3 viewDirection : COORDS;
+	float3 tangent : TANGENT;
+	float3 binormal : BINORMAL;
+};
+
+Texture2D ObjTexture : register(t0);
+Texture2D ObjNormTex : register(t1);
+SamplerState ObjSamplerState;
+
+float4 PS( VS_OUTPUT input ) : SV_Target
+{
+	input.normal = normalize(input.normal);
+	float4 textureColor = ObjTexture.Sample( ObjSamplerState, input.TexCoord );
+	float4 lightmap = ObjNormTex.Sample( ObjSamplerState, input.TexCoord );
+
+
+	float lightIntensity = dot(light.direction, input.normal);
+	float4 ll = lightIntensity * light.diffuse;
+
+	if (ll.r < lightmap.r)
+		ll.r = lightmap.r;
+
+	if (ll.g < lightmap.g)
+		ll.g = lightmap.g;
+
+	if (ll.b < lightmap.b)
+		ll.b = lightmap.b;
+
+	float4 fc = light.ambient;
+	float4 tempSpecular = float4(0.0f,0.0f,0.0f,0.0f);
+	if(lightIntensity > 0.0f){
+		fc = (light.diffuse * lightIntensity);
+		float3 reflection = normalize(2 * lightIntensity * input.normal - light.direction);
+		tempSpecular = pow(saturate(dot(reflection,input.viewDirection)),light.specularPower);
+	}
+
+
+	fc = fc * textureColor;
+	fc = saturate(fc + tempSpecular);
+
+	float3 finalColor = textureColor * light.ambient;
+	finalColor += saturate(ll * textureColor);
+
+	return float4(finalColor, textureColor.a);
+}

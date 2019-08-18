@@ -1,0 +1,51 @@
+struct Light
+{
+	float3 direction;
+	float pad;
+	float4 ambient;
+	float4 diffuse;
+};
+
+cbuffer ConstantBufferPS
+{
+	Light light;
+};
+
+struct VS_OUTPUT
+{
+	float4 Pos : SV_POSITION;
+	float2 TexCoord : TEXTURE;
+	float3 normal : NORMAL;
+	float3 viewDirection : COORDS;
+	float3 tangent : TANGENT;
+	float3 binormal : BINORMAL;
+};
+
+Texture2D ObjTexture;
+Texture2D ObjNormTex;
+SamplerState ObjSamplerState;
+
+float4 PS( VS_OUTPUT input ) : SV_Target
+{
+	input.normal = normalize(input.normal);
+	float4 textureColor = ObjTexture.Sample( ObjSamplerState, input.TexCoord );
+
+	input.tangent = normalize(input.tangent);
+	input.binormal = normalize(input.binormal);
+	
+	float4 textureColor = ObjTexture.Sample( ObjSamplerState, input.TexCoord );
+	float4 normalMap = ObjNormTex.Sample( ObjSamplerState, input.TexCoord );
+
+	//Change normal map range from [0, 1] to [-1, 1]
+	normalMap = (2.0f*normalMap) - 1.0f;
+
+	// Calculate the normal from the data in the bump map.
+	float3 bumpNormal = (normalMap.x * input.tangent) + (normalMap.y * input.binormal) + (normalMap.z * input.normal);
+	bumpNormal = normalize(bumpNormal);
+
+	float3 finalColor = textureColor * light.ambient;
+	finalColor += saturate(saturate(dot(light.direction, bumpNormal)) * light.diffuse) * textureColor;
+	
+	return float4(finalColor, textureColor.a);
+	
+}

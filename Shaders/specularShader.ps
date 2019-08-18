@@ -1,0 +1,43 @@
+struct Light
+{
+	float3 direction;
+	float specularPower;
+	float4 ambient;
+	float4 diffuse;
+};
+
+cbuffer ConstantBufferPS
+{
+	Light light;
+};
+
+struct VS_OUTPUT
+{
+	float4 Pos : SV_POSITION;
+	float2 TexCoord : TEXTURE;
+	float3 normal : NORMAL;
+	float3 viewDirection : COORDS;
+};
+
+Texture2D ObjTexture;
+Texture2D ObjNormTex;
+SamplerState ObjSamplerState;
+
+float4 PS( VS_OUTPUT input ) : SV_Target
+{
+	input.normal = normalize(input.normal);
+	float4 textureColor = ObjTexture.Sample( ObjSamplerState, input.TexCoord );
+
+	float4 tempSpecular = float4(0.0f,0.0f,0.0f,0.0f);
+	float4 finalColor = light.ambient;
+	float lightIntensity = saturate(dot(input.normal,light.direction));
+
+	if(lightIntensity > 0.0f){
+		finalColor += (light.diffuse * lightIntensity);
+		float3 reflection = normalize(2 * lightIntensity * input.normal - light.direction);
+		tempSpecular = pow(saturate(dot(reflection,input.viewDirection)),light.specularPower);
+	}
+
+	return finalColor;
+	
+}
